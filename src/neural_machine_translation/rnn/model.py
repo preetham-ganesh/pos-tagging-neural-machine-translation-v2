@@ -1,12 +1,12 @@
 import tensorflow as tf
 
-from typing import Dict, Any
+from typing import List, Any
 
 
 class Encoder(tf.keras.Model):
     """"""
 
-    def __init__(self, units: int, vocab_size: int, n_layers: int, rate: float):
+    def __init__(self, units: int, vocab_size: int, n_layers: int, rate: float) -> None:
         """Initializes the layers in the Encoder model, by adding various layers.
 
         Initializes the layers in the Encoder model, by adding various layers.
@@ -39,7 +39,7 @@ class Encoder(tf.keras.Model):
         self.model_layers = dict()
 
         # Initializes bidirectional RNN block.
-        self.model_layers["embedding"] = tf.keras.layers.Embedding(
+        self.model_layers["embedding_0"] = tf.keras.layers.Embedding(
             input_dim=vocab_size, output_dim=units, name="embedding_0"
         )
         self.model_layers["rnn_fwd"] = tf.keras.layers.LSTM(
@@ -89,7 +89,64 @@ class Encoder(tf.keras.Model):
             self.model_layers[f"dropout_{l_id}"] = tf.keras.layers.Dropout(
                 rate=rate, name=f"dropout_{l_id}"
             )
-            self.model_layers[f"dropout_{l_id}"] = tf.keras.layers.Dropout(
-                rate=rate, name=f"dropout_{l_id}"
+            self.model_layers[f"dropout_{l_id + 1}"] = tf.keras.layers.Dropout(
+                rate=rate, name=f"dropout_{l_id + 1}"
             )
             l_id += 2
+
+    def call(
+        self,
+        inputs: List[tf.Tensor],
+        training: bool = False,
+        masks: List[tf.Tensor] = None,
+    ) -> List[tf.Tensor]:
+        """Input tensor is passed through the layers in the model.
+
+        Input tensor is passed through the layers in the model.
+
+        Args:
+            inputs: A list for the inputs from the input batch.
+            training: A boolean value for the flag of training/testing state.
+            masks: A tensor for the masks from the input batch.
+
+        Returns:
+            A tensor for the processed output from the components in the layer.
+        """
+        # Asserts type & values of the input arguments.
+        assert isinstance(inputs, list), "Variable inputs should be of type 'list'."
+        assert isinstance(training, bool), "Variable training should be of type 'bool'."
+        assert (
+            isinstance(masks, list) or masks is None
+        ), "Variable masks should be of type 'list' or masks should have value as 'None'."
+
+        # Passes input through bidirectional RNN block.
+        x, memory_state, carry_state = inputs[0]
+        x = self.model_layers["embedding_0"](x)
+        x, memory_state, carry_state = self.model_layers["bi_rnn"](
+            x, initial_state=[memory_state, carry_state]
+        )
+        x = self.model_layers["dropout_0"](x)
+        memory_state = self.model_layers["dropout_1"](memory_state)
+        carry_state = self.model_layers["dropout_1"](memory_state)
+
+        # Passes inputs through RNN blocks.
+        l_id = 2
+        while l_id < self.n_layers:
+            x_, memory_state_, carry_state_ = self.model_layers[f"rnn_{l_id}"](
+                x, initial_state=[memory_state, carry_state]
+            )
+            x = self.model_layers[f"add_{l_id - 2}"]([x, x_])
+            memory_state = self.model_layers[f"add_{l_id - 1}"](
+                [memory_state, memory_state_]
+            )
+            carry_state = self.model_layers[f"add_{l_id - 1}"](
+                [carry_state, carry_state_]
+            )
+            del x_, memory_state_, carry_state_
+            x, memory_state, carry_state = self.model_layers[f"rnn_{l_id + 1}"](
+                x, initial_state=[memory_state, carry_state]
+            )
+            x = self.model_layers[f"dropout_{l_id}"](x)
+            memory_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
+            carry_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
+        return [x, memory_state, carry_state]
