@@ -216,3 +216,24 @@ class Encoder(tf.keras.Model):
             tf.zeros(batch_size, self.units // 2),
             tf.zeros(batch_size, self.units // 2),
         ]
+
+    def build_graph(self) -> tf.keras.Model:
+        """Builds plottable graph for the model.
+
+        Builds plottable graph for the model.
+
+        Args:
+            None.
+
+        Returns:
+            A tensorflow model based on image height, width & n_channels in the model configuration.
+        """
+        # Creates the input layer using the model configuration.
+        inputs = [
+            tf.keras.layers.Input(shape=(None,)),
+            tf.keras.layers.Input(shape=(self.units // 2,)),
+            tf.keras.layers.Input(shape=(self.units // 2,)),
+            tf.keras.layers.Input(shape=(self.units // 2,)),
+            tf.keras.layers.Input(shape=(self.units // 2,)),
+        ]
+        return tf.keras.Model(inputs=inputs, outputs=self.call(inputs, False, None))
