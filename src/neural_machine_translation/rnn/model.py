@@ -48,12 +48,12 @@ class Encoder(tf.keras.Model):
             input_dim=vocab_size, output_dim=units, name="embedding_0"
         )
         self.model_layers["rnn_fwd"] = tf.keras.layers.LSTM(
-            units=units, return_state=True, return_sequence=True, name="rnn_fwd"
+            units=units // 2, return_state=True, return_sequences=True, name="rnn_fwd"
         )
         self.model_layers["rnn_bwd"] = tf.keras.layers.LSTM(
-            units=units,
+            units=units // 2,
             return_state=True,
-            return_sequence=True,
+            return_sequences=True,
             go_backwards=True,
             name="rnn_bwd",
         )
@@ -67,7 +67,13 @@ class Encoder(tf.keras.Model):
             rate=rate, name="dropout_0"
         )
         self.model_layers["dropout_1"] = tf.keras.layers.Dropout(
-            rate=rate, name="droptout_1"
+            rate=rate, name="dropout_1"
+        )
+        self.model_layers["concat_0"] = tf.keras.layers.Concatenate(
+            axis=-1, name="concat_0"
+        )
+        self.model_layers["concat_1"] = tf.keras.layers.Concatenate(
+            axis=-1, name="concat_1"
         )
 
         # Initializes RNN blocks.
@@ -76,13 +82,13 @@ class Encoder(tf.keras.Model):
             self.model_layers[f"rnn_{l_id}"] = tf.keras.layers.LSTM(
                 units=units,
                 return_state=True,
-                return_sequence=True,
+                return_sequences=True,
                 name=f"rnn_{l_id}",
             )
             self.model_layers[f"rnn_{l_id + 1}"] = tf.keras.layers.LSTM(
                 units=units,
                 return_state=True,
-                return_sequence=True,
+                return_sequences=True,
                 name=f"rnn_{l_id + 1}",
             )
             self.model_layers[f"add_{l_id - 2}"] = tf.keras.layers.Add(
@@ -125,14 +131,44 @@ class Encoder(tf.keras.Model):
         ), "Variable masks should be of type 'list' or masks should have value as 'None'."
 
         # Passes input through bidirectional RNN block.
-        x, memory_state, carry_state = inputs[0]
+        (
+            x,
+            forward_memory_state,
+            forward_carry_state,
+            backward_memory_state,
+            backward_carry_state,
+        ) = inputs
         x = self.model_layers["embedding_0"](x)
-        x, memory_state, carry_state = self.model_layers["bi_rnn"](
-            x, initial_state=[memory_state, carry_state]
+        (
+            x,
+            forward_memory_state,
+            forward_carry_state,
+            backward_memory_state,
+            backward_carry_state,
+        ) = self.model_layers["bi_rnn"](
+            x,
+            initial_state=[
+                forward_memory_state,
+                forward_carry_state,
+                backward_memory_state,
+                backward_carry_state,
+            ],
+        )
+        memory_state = self.model_layers["concat_0"](
+            [forward_memory_state, backward_memory_state]
+        )
+        carry_state = self.model_layers["concat_1"](
+            [forward_carry_state, backward_carry_state]
+        )
+        del (
+            forward_memory_state,
+            forward_carry_state,
+            backward_memory_state,
+            backward_carry_state,
         )
         x = self.model_layers["dropout_0"](x)
         memory_state = self.model_layers["dropout_1"](memory_state)
-        carry_state = self.model_layers["dropout_1"](memory_state)
+        carry_state = self.model_layers["dropout_1"](carry_state)
 
         # Passes inputs through RNN blocks.
         l_id = 2
@@ -153,7 +189,8 @@ class Encoder(tf.keras.Model):
             )
             x = self.model_layers[f"dropout_{l_id}"](x)
             memory_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
-            carry_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
+            carry_state = self.model_layers[f"dropout_{l_id + 1}"](carry_state)
+            l_id += 2
         return [x, memory_state, carry_state]
 
     def initialize_hidden_states(self, batch_size: int) -> List[tf.Tensor]:
