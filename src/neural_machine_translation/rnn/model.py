@@ -24,14 +24,19 @@ class Encoder(tf.keras.Model):
 
         # Asserts type of input arguments.
         assert isinstance(units, int), "Variable units should be of type 'int'."
+        assert (
+            units % 2 == 0
+        ), "Variable units should be divisible by 2, and greater than 0."
         assert isinstance(
             vocab_size, int
         ), "Variable vocab_size should be of type 'int'."
+        assert vocab_size > 0, "Variable vocab_size should be greater than 0."
         assert isinstance(n_layers, int), "Variable n_layers should be of type 'int'."
         assert (
             n_layers % 2 == 0 and n_layers > 0
         ), "Variable n_layers should be divisible by 2 and greater than 0."
         assert isinstance(rate, float), "Variable rate should be of type 'float'."
+        assert 0 <= rate <= 1, "Variable rate should be between 0 & 1."
 
         # Initializes class variables.
         self.units = units
@@ -150,3 +155,27 @@ class Encoder(tf.keras.Model):
             memory_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
             carry_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
         return [x, memory_state, carry_state]
+
+    def initialize_hidden_states(self, batch_size: int) -> List[tf.Tensor]:
+        """Initializes hidden states for the bidirectional RNN in the model.
+
+        Initializes hidden states for the bidirectional RNN in the model.
+
+        Args:
+            batch_size: An integer for the size of current batch.
+
+        Returns:
+            A list of tensors for bidirectional RNN's hidden states of shape (batch_size, units / 2).
+        """
+        # Asserts type & values of the input arguments.
+        assert isinstance(
+            batch_size, int
+        ), "Variable batch_size should be of type 'int'."
+
+        # Returns initial states for forward & backward memory, and forward & backward carry states.
+        return [
+            tf.zeros(batch_size, self.units // 2),
+            tf.zeros(batch_size, self.units // 2),
+            tf.zeros(batch_size, self.units // 2),
+            tf.zeros(batch_size, self.units // 2),
+        ]
