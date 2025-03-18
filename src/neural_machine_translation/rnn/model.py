@@ -111,9 +111,9 @@ class Encoder(tf.keras.Model):
         training: bool = False,
         masks: List[tf.Tensor] = None,
     ) -> List[tf.Tensor]:
-        """Input tensor is passed through the layers in the model.
+        """Inputs are passed through the layers in the model.
 
-        Input tensor is passed through the layers in the model.
+        Inputs are passed through the layers in the model.
 
         Args:
             inputs: A list for the inputs from the input batch.
@@ -240,7 +240,7 @@ class Encoder(tf.keras.Model):
 
 
 class BahdanauAttention(tf.keras.layers.Layer):
-    """"""
+    """Implements Bahdanau Attention mechanism by computing context vector using Encoder output & hidden states."""
 
     def __init__(self, units: int) -> None:
         """Initializes components in the BahdanauAttention layer in the model.
@@ -262,3 +262,45 @@ class BahdanauAttention(tf.keras.layers.Layer):
         self.dense_0 = tf.keras.layers.Dense(units=units)
         self.dense_1 = tf.keras.layers.Dense(units=units)
         self.dense_2 = tf.keras.layers.Dense(units=units)
+        self.dense_3 = tf.keras.layers.Dense(units=units)
+        self.reshape_0 = tf.keras.layers.Reshape(target_shape=(1, -1))
+        self.add_0 = tf.keras.layers.Add()
+        self.multiply_0 = tf.keras.layers.Multiply()
+
+    def call(
+        self, encoder_out: tf.Tensor, memory_state: tf.Tensor, carry_state: tf.Tensor
+    ) -> tf.Tensor:
+        """Inputs are passed through components in the layer.
+
+        Inputs are passed through components in the layer.
+
+        Args:
+            encoder_out: A tensor for the output from the encoder.
+            memory_state: A tensor for the memory state from the last RNN layer in encoder.
+            carry_state: A tensor for the carry state from the last RNN layer in encoder.
+
+        Returns:
+            A tensor for the context vector computed using Bahdanau Attention.
+        """
+        # Reshapes memory & carry state to add axis for time.
+        memory_time = self.reshape_0(memory_state)
+        carry_time = self.reshape_0(carry_state)
+
+        # Computes attention score using encoder output, reshaped memory & carry states.
+        attention_score = self.dense_3(
+            tf.keras.activations.tanh(
+                self.add_0(
+                    [
+                        self.dense_0(encoder_out),
+                        self.dense_1(memory_time),
+                        self.dense_2(carry_time),
+                    ]
+                )
+            )
+        )
+        attention_weights = tf.keras.activations.softmax(attention_score, axis=-1)
+
+        # Computes context vector using attention weights & encoder out.
+        context_vector = self.multiply_0([attention_weights, encoder_out])
+        context_vector = tf.reduce_sum(context_vector, axis=1)
+        return context_vector
