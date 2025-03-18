@@ -237,3 +237,28 @@ class Encoder(tf.keras.Model):
             tf.keras.layers.Input(shape=(self.units // 2,)),
         ]
         return tf.keras.Model(inputs=inputs, outputs=self.call(inputs, False, None))
+
+
+class BahdanauAttention(tf.keras.layers.Layer):
+    """"""
+
+    def __init__(self, units: int) -> None:
+        """Initializes components in the BahdanauAttention layer in the model.
+
+        Initializes components in the BahdanauAttention layer in the model.
+
+        Args:
+            units: An integer for the no. of units in the layer.
+
+        Returns:
+            None.
+        """
+        super(BahdanauAttention, self).__init__()
+
+        # Asserts type of input arguments.
+        assert isinstance(units, int), "Variable units should be of type 'int'."
+
+        # Initializes class variables.
+        self.dense_0 = tf.keras.layers.Dense(units=units)
+        self.dense_1 = tf.keras.layers.Dense(units=units)
+        self.dense_2 = tf.keras.layers.Dense(units=units)
