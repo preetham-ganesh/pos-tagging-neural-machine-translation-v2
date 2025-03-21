@@ -307,7 +307,8 @@ class BahdanauAttention(tf.keras.layers.Layer):
 
 
 class BahdanauDecoder(tf.keras.Model):
-    """"""
+    """A custom decoder model with Bahdanau attention and stacked RNN blocks, including residual LSTM layers for
+    sequence-to-sequence learning tasks."""
 
     def __init__(
         self, units: int, vocab_size: int, n_rnn_blocks: int, rate: float
@@ -402,7 +403,7 @@ class BahdanauDecoder(tf.keras.Model):
 
         # Initializes Reshape & final dense layers.
         self.model_layers["reshape_1"] = tf.keras.layers.Reshape(
-            target_shape=(-1,), name="reshape_1"
+            target_shape=(self.units,), name="reshape_1"
         )
         self.model_layers["final"] = tf.keras.layers.Dense(vocab_size, name="final")
 
@@ -433,20 +434,20 @@ class BahdanauDecoder(tf.keras.Model):
 
         # Passes inputs through Embedding, Bahdanau attention, Concatenate & Reshape layers.
         x, encoder_out, memory_state, carry_state = inputs
-        context_vector = self.model_layers["block_0_attention_0"](
+        context_vector = self.model_layers["attention_0"](
             encoder_out, memory_state, carry_state
         )
-        context_vector = self.model_layers["block_0_reshape_0"](context_vector)
-        x = self.model_layers["block_0_embedding_0"](x)
-        x = self.model_layers["block_0_concat_0"]([x, context_vector])
+        context_vector = self.model_layers["reshape_0"](context_vector)
+        x = self.model_layers["embedding_0"](x)
+        x = self.model_layers["concat_0"]([x, context_vector])
 
         # Passes inputs through RNN processing block.
-        x, memory_state, carry_state = self.model_layers["block_1_rnn_0"](x)
-        x = self.model_layers["block_1_dropout_0"](x)
-        x = self.model_layers["block_1_rnn_1"](
+        x, memory_state, carry_state = self.model_layers["block_0_rnn_0"](x)
+        x = self.model_layers["block_0_dropout_0"](x)
+        x, memory_state, carry_state = self.model_layers["block_0_rnn_1"](
             x, initial_state=[memory_state, carry_state]
         )
-        x = self.model_layers["block_1_dropout_1"](x)
+        x = self.model_layers["block_0_dropout_1"](x)
 
         # Passes inputs through RNN residual blocks.
         b_id = 1
@@ -472,3 +473,23 @@ class BahdanauDecoder(tf.keras.Model):
         x = self.model_layers["reshape_1"](x)
         x = self.model_layers["final"](x)
         return [x, memory_state, carry_state]
+
+    def build_graph(self) -> tf.keras.Model:
+        """Builds plottable graph for the model.
+
+        Builds plottable graph for the model.
+
+        Args:
+            None.
+
+        Returns:
+            A tensorflow model based on image height, width & n_channels in the model configuration.
+        """
+        # Creates the input layer using the model configuration.
+        inputs = [
+            tf.keras.layers.Input(shape=(None,)),
+            tf.keras.layers.Input(shape=(None, self.units)),
+            tf.keras.layers.Input(shape=(self.units,)),
+            tf.keras.layers.Input(shape=(self.units,)),
+        ]
+        return tf.keras.Model(inputs=inputs, outputs=self.call(inputs, False, None))
