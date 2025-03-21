@@ -539,7 +539,8 @@ class LuongAttention(tf.keras.layers.Layer):
 
 
 class LuongDecoder(tf.keras.Model):
-    """"""
+    """A custom decoder model with Luong attention and stacked RNN blocks, including residual LSTM layers for
+    sequence-to-sequence learning tasks."""
 
     def __init__(
         self, units: int, vocab_size: int, n_rnn_blocks: int, rate: float
@@ -626,6 +627,7 @@ class LuongDecoder(tf.keras.Model):
             b_id += 1
 
         # Initializes Reshape, Concatenate, Dropout & Dense layers.
+        self.model_layers["attention_0"] = LuongAttention(units)
         self.model_layers["reshape_0"] = tf.keras.layers.Reshape(
             target_shape=(self.units,), name="reshape_0"
         )
@@ -700,7 +702,7 @@ class LuongDecoder(tf.keras.Model):
             b_id += 1
 
         # Passes inputs through Luong Attention, Reshape, Concat, Dense & Dropout layers.
-        context_vector = self.model_layers["attention_0"]([x, encoder_out])
+        context_vector = self.model_layers["attention_0"](x, encoder_out)
         context_vector = self.model_layers["reshape_0"](context_vector)
         x = self.model_layers["reshape_0"](x)
         x = self.model_layers["concat_0"]([context_vector, x])
@@ -708,3 +710,22 @@ class LuongDecoder(tf.keras.Model):
         x = self.model_layers["dropout_0"](x, training=training)
         x = self.model_layers["final"](x)
         return [x, memory_state, carry_state]
+
+    def build_graph(self) -> tf.keras.Model:
+        """Builds plottable graph for the model.
+
+        Builds plottable graph for the model.
+
+        Args:
+            None.
+
+        Returns:
+            A tensorflow model based on image height, width & n_channels in the model configuration.
+        """
+        inputs = [
+            tf.keras.layers.Input(shape=(None,)),
+            tf.keras.layers.Input(shape=(None, self.units)),
+            tf.keras.layers.Input(shape=(self.units,)),
+            tf.keras.layers.Input(shape=(self.units,)),
+        ]
+        return tf.keras.Model(inputs=inputs, outputs=self.call(inputs, False, None))
