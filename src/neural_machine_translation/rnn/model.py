@@ -489,3 +489,28 @@ class BahdanauDecoder(tf.keras.Model):
             tf.keras.layers.Input(shape=(self.units,)),
         ]
         return tf.keras.Model(inputs=inputs, outputs=self.call(inputs, False, None))
+
+
+class LuongAttention(tf.keras.layers.Layer):
+    """"""
+
+    def __init__(self, units: int) -> None:
+        """Initializes components in the LuongAttention layer in the model.
+
+        Initializes components in the LuongAttention layer in the model.
+
+        Args:
+            units: An integer for the no. of units in the layer.
+
+        Returns:
+            None.
+        """
+        super(LuongAttention, self).__init__()
+
+        # Asserts type of input arguments.
+        assert isinstance(units, int), "Variable units should be of type 'int'."
+
+        # Initializes class variables.
+        self.dense_0 = tf.keras.layers.Dense(units=units)
+        self.dot_score = tf.keras.layers.Dot(axes=[2, 2])
+        self.context_dot = tf.keras.layers.Dot(axes=[2, 1])
