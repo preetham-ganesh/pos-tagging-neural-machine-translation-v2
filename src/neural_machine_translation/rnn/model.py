@@ -514,3 +514,25 @@ class LuongAttention(tf.keras.layers.Layer):
         self.dense_0 = tf.keras.layers.Dense(units=units)
         self.dot_score = tf.keras.layers.Dot(axes=[2, 2])
         self.context_dot = tf.keras.layers.Dot(axes=[2, 1])
+
+    def call(self, encoder_out: tf.Tensor, decoder_out: tf.Tensor) -> tf.Tensor:
+        """Inputs are passed through components in the layer.
+
+        Inputs are passed through components in the layer.
+
+        Args:
+            encoder_out: A tensor for the output from the encoder.
+            decoder_out: A tensor for the output from the decoder.
+
+        Returns:
+            A tensor for the context vector computed using Luong Attention.
+        """
+        # Computes attention score using encoder & decoder output.
+        attention_score = self.dot_score([decoder_out, self.dense_0(encoder_out)])
+
+        # Applies softmax activation to get alignment.
+        alignment = tf.keras.activations.softmax(attention_score, axis=-1)
+
+        # Compute context vector as weighted sum of encoder outputs
+        context_vector = self.context_dot([alignment, encoder_out])
+        return context_vector
