@@ -492,7 +492,7 @@ class BahdanauDecoder(tf.keras.Model):
 
 
 class LuongAttention(tf.keras.layers.Layer):
-    """"""
+    """Implements Luong-style attention mechanism as a custom Keras layer."""
 
     def __init__(self, units: int) -> None:
         """Initializes components in the LuongAttention layer in the model.
@@ -536,3 +536,106 @@ class LuongAttention(tf.keras.layers.Layer):
         # Compute context vector as weighted sum of encoder outputs
         context_vector = self.context_dot([alignment, encoder_out])
         return context_vector
+
+
+class LuongDecoder(tf.keras.Model):
+    """"""
+
+    def __init__(
+        self, units: int, vocab_size: int, n_rnn_blocks: int, rate: float
+    ) -> None:
+        """Initializes the layers in the LuongDecoder model, by adding various layers.
+
+        Initializes the layers in the LuongDecoder model, by adding various layers.
+
+        Args:
+            units: An integer for the size of each layer in the model.
+            vocab_size: An integer for the size of the vocabulary in the input language.
+            n_rnn_blocks: An integer for the no. of RNN blocks in the model (where each block would have 2 RNN layers).
+            rate: A floating point value for the dropout rate in the model.
+
+        Returns:
+            None.
+        """
+        super(LuongDecoder, self).__init__()
+
+        # Asserts type of input arguments.
+        assert isinstance(units, int), "Variable units should be of type 'int'."
+        assert (
+            units % 2 == 0
+        ), "Variable units should be divisible by 2, and greater than 0."
+        assert isinstance(
+            vocab_size, int
+        ), "Variable vocab_size should be of type 'int'."
+        assert vocab_size > 0, "Variable vocab_size should be greater than 0."
+        assert isinstance(
+            n_rnn_blocks, int
+        ), "Variable n_rnn_blocks should be of type 'int'."
+        assert n_rnn_blocks > 0, "Variable n_rnn_blocks should be greater than 0."
+        assert isinstance(rate, float), "Variable rate should be of type 'float'."
+        assert 0 <= rate <= 1, "Variable rate should be between 0 & 1."
+
+        # Initializes class variables.
+        self.units = units
+        self.n_rnn_blocks = n_rnn_blocks
+        self.model_layers = dict()
+
+        # Initializes Embedding, Bahdanau attention, Concatenate & Reshape layers.
+        self.model_layers["embedding_0"] = tf.keras.layers.Embedding(
+            input_dim=vocab_size, output_dim=units, name="embedding_0"
+        )
+
+        # Initializes the RNN processing block.
+        self.model_layers["block_0_rnn_0"] = tf.keras.layers.LSTM(
+            units=units, return_state=True, return_sequences=True, name="block_0_rnn_0"
+        )
+        self.model_layers["block_0_dropout_0"] = tf.keras.layers.Dropout(
+            rate=rate, name="block_0_dropout_0"
+        )
+        self.model_layers["block_0_rnn_1"] = tf.keras.layers.LSTM(
+            units=units, return_state=True, return_sequences=True, name="block_0_rnn_1"
+        )
+        self.model_layers["block_0_dropout_1"] = tf.keras.layers.Dropout(
+            rate=rate, name="block_0_dropout_1"
+        )
+
+        # Initializes RNN residual blocks.
+        b_id = 1
+        while b_id < n_rnn_blocks:
+            self.model_layers[f"block_{b_id}_rnn_0"] = tf.keras.layers.LSTM(
+                units=units,
+                return_state=True,
+                return_sequences=True,
+                name=f"block_{b_id}_rnn_0",
+            )
+            self.model_layers[f"block_{b_id}_rnn_1"] = tf.keras.layers.LSTM(
+                units=units,
+                return_state=True,
+                return_sequences=True,
+                name=f"block_{b_id}_rnn_1",
+            )
+            self.model_layers[f"block_{b_id}_add_0"] = tf.keras.layers.Add(
+                name=f"block_{b_id}_add_0"
+            )
+            self.model_layers[f"block_{b_id}_add_1"] = tf.keras.layers.Add(
+                name=f"block_{b_id}_add_1"
+            )
+            self.model_layers[f"block_{b_id}_dropout_0"] = tf.keras.layers.Dropout(
+                rate=rate, name=f"block_{b_id}_dropout_0"
+            )
+            b_id += 1
+
+        # Initializes Reshape, Concatenate, Dropout & Dense layers.
+        self.model_layers["reshape_0"] = tf.keras.layers.Reshape(
+            target_shape=(self.units,), name="reshape_0"
+        )
+        self.model_layers["concat_0"] = tf.keras.layers.Concatenate(
+            axis=-1, name="concat_0"
+        )
+        self.model_layers["dense_0"] = tf.keras.layers.Dense(
+            units, activation="tanh", name="dense_0"
+        )
+        self.model_layers["dropout_0"] = tf.keras.layers.Dropout(
+            rate=rate, name="dropout_0"
+        )
+        self.model_layers["final"] = tf.keras.layers.Dense(vocab_size, name="final")
