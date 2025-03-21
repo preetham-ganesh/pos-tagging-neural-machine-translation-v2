@@ -348,39 +348,33 @@ class BahdanauDecoder(tf.keras.Model):
         self.n_rnn_blocks = n_rnn_blocks
         self.model_layers = dict()
 
-        # Initializes embedding, bahdanau attention, reshape & concatenate layers.
-        self.model_layers["block_0_embedding_0"] = tf.keras.layers.Embedding(
-            input_dim=vocab_size, output_dim=units, name="block_0_embedding_0"
+        # Initializes Embedding, Bahdanau attention, Concatenate & Reshape layers.
+        self.model_layers["embedding_0"] = tf.keras.layers.Embedding(
+            input_dim=vocab_size, output_dim=units, name="embedding_0"
         )
-        self.model_layers["block_0_attention_0"] = BahdanauAttention(units)
-        self.model_layers["block_0_concat_0"] = tf.keras.layers.Concatenate(
-            axis=-1, name="block_0_concat_0"
+        self.model_layers["attention_0"] = BahdanauAttention(units)
+        self.model_layers["concat_0"] = tf.keras.layers.Concatenate(
+            axis=-1, name="concat_0"
         )
-        self.model_layers["block_0_reshape_0"] = tf.keras.layers.Reshape(
-            target_shape=(1, -1), name="block_0_reshape_0"
-        )
-
-        # Initializes the RNN & droptout layers.
-        self.model_layers["block_1_rnn_0"] = tf.keras.layers.LSTM(
-            units=units, return_state=True, return_sequences=True, name="block_1_rnn_0"
-        )
-        self.model_layers["block_1_dropout_0"] = tf.keras.layers.Dropout(
-            rate=rate, name="block_1_dropout_0"
-        )
-        self.model_layers["block_1_dropout_1"] = tf.keras.layers.Dropout(
-            rate=rate, name="block_1_dropout_1"
-        )
-        self.model_layers["block_1_rnn_1"] = tf.keras.layers.LSTM(
-            units=units, return_state=True, return_sequences=True, name="block_1_rnn_1"
-        )
-        self.model_layers["block_1_dropout_2"] = tf.keras.layers.Dropout(
-            rate=rate, name="block_1_dropout_2"
-        )
-        self.model_layers["block_1_dropout_3"] = tf.keras.layers.Dropout(
-            rate=rate, name="block_1_dropout_3"
+        self.model_layers["reshape_0"] = tf.keras.layers.Reshape(
+            target_shape=(1, -1), name="reshape_0"
         )
 
-        # Initializes RNN blocks.
+        # Initializes the RNN processing block.
+        self.model_layers["block_0_rnn_0"] = tf.keras.layers.LSTM(
+            units=units, return_state=True, return_sequences=True, name="block_0_rnn_0"
+        )
+        self.model_layers["block_0_dropout_0"] = tf.keras.layers.Dropout(
+            rate=rate, name="block_0_dropout_0"
+        )
+        self.model_layers["block_0_rnn_1"] = tf.keras.layers.LSTM(
+            units=units, return_state=True, return_sequences=True, name="block_0_rnn_1"
+        )
+        self.model_layers["block_0_dropout_1"] = tf.keras.layers.Dropout(
+            rate=rate, name="block_0_dropout_1"
+        )
+
+        # Initializes RNN residual blocks.
         b_id = 1
         while b_id < n_rnn_blocks:
             self.model_layers[f"block_{b_id}_rnn_0"] = tf.keras.layers.LSTM(
@@ -404,7 +398,77 @@ class BahdanauDecoder(tf.keras.Model):
             self.model_layers[f"block_{b_id}_dropout_0"] = tf.keras.layers.Dropout(
                 rate=rate, name=f"block_{b_id}_dropout_0"
             )
-            self.model_layers[f"block_{b_id}_dropout_1"] = tf.keras.layers.Dropout(
-                rate=rate, name=f"block_{b_id}_dropout_1"
-            )
             b_id += 1
+
+        # Initializes Reshape & final dense layers.
+        self.model_layers["reshape_1"] = tf.keras.layers.Reshape(
+            target_shape=(-1,), name="reshape_1"
+        )
+        self.model_layers["final"] = tf.keras.layers.Dense(vocab_size, name="final")
+
+    def call(
+        self,
+        inputs: List[tf.Tensor],
+        training: bool = False,
+        masks: List[tf.Tensor] = None,
+    ) -> List[tf.Tensor]:
+        """Inputs are passed through the layers in the model.
+
+        Inputs are passed through the layers in the model.
+
+        Args:
+            inputs: A list for the inputs from the input batch.
+            training: A boolean value for the flag of training/testing state.
+            masks: A tensor for the masks from the input batch.
+
+        Returns:
+            A tensor for the processed output from the components in the layer.
+        """
+        # Asserts type & values of the input arguments.
+        assert isinstance(inputs, list), "Variable inputs should be of type 'list'."
+        assert isinstance(training, bool), "Variable training should be of type 'bool'."
+        assert (
+            isinstance(masks, list) or masks is None
+        ), "Variable masks should be of type 'list' or masks should have value as 'None'."
+
+        # Passes inputs through Embedding, Bahdanau attention, Concatenate & Reshape layers.
+        x, encoder_out, memory_state, carry_state = inputs
+        context_vector = self.model_layers["block_0_attention_0"](
+            encoder_out, memory_state, carry_state
+        )
+        context_vector = self.model_layers["block_0_reshape_0"](context_vector)
+        x = self.model_layers["block_0_embedding_0"](x)
+        x = self.model_layers["block_0_concat_0"]([x, context_vector])
+
+        # Passes inputs through RNN processing block.
+        x, memory_state, carry_state = self.model_layers["block_1_rnn_0"](x)
+        x = self.model_layers["block_1_dropout_0"](x)
+        x = self.model_layers["block_1_rnn_1"](
+            x, initial_state=[memory_state, carry_state]
+        )
+        x = self.model_layers["block_1_dropout_1"](x)
+
+        # Passes inputs through RNN residual blocks.
+        b_id = 1
+        while b_id < self.n_rnn_blocks:
+            x_, memory_state_, carry_state_ = self.model_layers[f"block_{b_id}_rnn_0"](
+                x, initial_state=[memory_state, carry_state]
+            )
+            x = self.model_layers[f"block_{b_id}_add_0"]([x, x_])
+            memory_state = self.model_layers[f"block_{b_id}_add_1"](
+                [memory_state, memory_state_]
+            )
+            carry_state = self.model_layers[f"block_{b_id}_add_1"](
+                [carry_state, carry_state_]
+            )
+            del x_, memory_state_, carry_state_
+            x, memory_state, carry_state = self.model_layers[f"block_{b_id}_rnn_1"](
+                x, initial_state=[memory_state, carry_state]
+            )
+            x = self.model_layers[f"block_{b_id}_dropout_0"](x)
+            b_id += 1
+
+        # Passes inputs through Reshape & final dense layers.
+        x = self.model_layers["reshape_1"](x)
+        x = self.model_layers["final"](x)
+        return [x, memory_state, carry_state]
