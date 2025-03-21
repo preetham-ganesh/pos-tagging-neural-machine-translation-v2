@@ -166,7 +166,7 @@ class Encoder(tf.keras.Model):
             backward_memory_state,
             backward_carry_state,
         )
-        x = self.model_layers["block_0_dropout_0"](x)
+        x = self.model_layers["block_0_dropout_0"](x, training=training)
 
         # Passes inputs through RNN blocks.
         b_id = 2
@@ -185,7 +185,7 @@ class Encoder(tf.keras.Model):
             x, memory_state, carry_state = self.model_layers[f"block_{b_id}_rnn_1"](
                 x, initial_state=[memory_state, carry_state]
             )
-            x = self.model_layers[f"block_{b_id}_dropout_0"](x)
+            x = self.model_layers[f"block_{b_id}_dropout_0"](x, training=training)
             b_id += 2
         return [x, memory_state, carry_state]
 
@@ -439,11 +439,11 @@ class BahdanauDecoder(tf.keras.Model):
 
         # Passes inputs through RNN processing block.
         x, memory_state, carry_state = self.model_layers["block_0_rnn_0"](x)
-        x = self.model_layers["block_0_dropout_0"](x)
+        x = self.model_layers["block_0_dropout_0"](x, training=training)
         x, memory_state, carry_state = self.model_layers["block_0_rnn_1"](
             x, initial_state=[memory_state, carry_state]
         )
-        x = self.model_layers["block_0_dropout_1"](x)
+        x = self.model_layers["block_0_dropout_1"](x, training=training)
 
         # Passes inputs through RNN residual blocks.
         b_id = 1
@@ -462,7 +462,7 @@ class BahdanauDecoder(tf.keras.Model):
             x, memory_state, carry_state = self.model_layers[f"block_{b_id}_rnn_1"](
                 x, initial_state=[memory_state, carry_state]
             )
-            x = self.model_layers[f"block_{b_id}_dropout_0"](x)
+            x = self.model_layers[f"block_{b_id}_dropout_0"](x, training=training)
             b_id += 1
 
         # Passes inputs through Reshape & final dense layers.
@@ -639,3 +639,72 @@ class LuongDecoder(tf.keras.Model):
             rate=rate, name="dropout_0"
         )
         self.model_layers["final"] = tf.keras.layers.Dense(vocab_size, name="final")
+
+    def call(
+        self,
+        inputs: List[tf.Tensor],
+        training: bool = False,
+        masks: List[tf.Tensor] = None,
+    ) -> List[tf.Tensor]:
+        """Inputs are passed through the layers in the model.
+
+        Inputs are passed through the layers in the model.
+
+        Args:
+            inputs: A list for the inputs from the input batch.
+            training: A boolean value for the flag of training/testing state.
+            masks: A tensor for the masks from the input batch.
+
+        Returns:
+            A tensor for the processed output from the components in the layer.
+        """
+        # Asserts type & values of the input arguments.
+        assert isinstance(inputs, list), "Variable inputs should be of type 'list'."
+        assert isinstance(training, bool), "Variable training should be of type 'bool'."
+        assert (
+            isinstance(masks, list) or masks is None
+        ), "Variable masks should be of type 'list' or masks should have value as 'None'."
+
+        # Passes inputs through Embedding layer.
+        x, encoder_out, memory_state, carry_state = inputs
+        x = self.model_layers["embedding_0"](x)
+
+        # Passes inputs through RNN processing block.
+        x, memory_state, carry_state = self.model_layers["block_0_rnn_0"](
+            x, initial_state=[memory_state, carry_state]
+        )
+        x = self.model_layers["block_0_dropout_0"](x, training=training)
+        x, memory_state, carry_state = self.model_layers["block_0_rnn_1"](
+            x, initial_state=[memory_state, carry_state]
+        )
+        x = self.model_layers["block_0_dropout_1"](x, training=training)
+
+        # Passes inputs through RNN residual blocks.
+        b_id = 1
+        while b_id < self.n_rnn_blocks:
+            x_, memory_state_, carry_state_ = self.model_layers[f"block_{b_id}_rnn_0"](
+                x, initial_state=[memory_state, carry_state]
+            )
+            x = self.model_layers[f"block_{b_id}_add_0"]([x, x_])
+            memory_state = self.model_layers[f"block_{b_id}_add_1"](
+                [memory_state, memory_state_]
+            )
+            carry_state = self.model_layers[f"block_{b_id}_add_1"](
+                [carry_state, carry_state_]
+            )
+            del x_, memory_state_, carry_state_
+            x, memory_state, carry_state = self.model_layers[f"block_{b_id}_rnn_1"](
+                x, initial_state=[memory_state, carry_state]
+            )
+            x = self.model_layers[f"block_{b_id}_dropout_0"](x, training=training)
+            b_id += 1
+
+        # Passes inputs through Luong Attention, Reshape, Concat, Dense & Dropout layers.
+        context_vector = self.model_layers["attention_0"]([x, encoder_out])
+        context_vector = self.model_layers["reshape_0"](context_vector)
+        x = self.model_layers["reshape_0"](x)
+        x = self.model_layers["concat_0"]([context_vector, x])
+        x = self.model_layers["dense_0"](x)
+        x = self.model_layers["dropout_0"](x, training=training)
+        x = self.model_layers["final"](x)
+        return [x, memory_state, carry_state]
