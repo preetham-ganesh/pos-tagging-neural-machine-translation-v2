@@ -4,9 +4,12 @@ from typing import List, Any
 
 
 class Encoder(tf.keras.Model):
-    """"""
+    """A custom encoder model with an embedding layer, a bidirectional LSTM block, and residual RNN blocks for use in
+    attention-based sequence-to-sequence models."""
 
-    def __init__(self, units: int, vocab_size: int, n_layers: int, rate: float) -> None:
+    def __init__(
+        self, units: int, vocab_size: int, n_rnn_blocks: int, rate: float
+    ) -> None:
         """Initializes the layers in the Encoder model, by adding various layers.
 
         Initializes the layers in the Encoder model, by adding various layers.
@@ -14,7 +17,7 @@ class Encoder(tf.keras.Model):
         Args:
             units: An integer for the size of each layer in the model.
             vocab_size: An integer for the size of the vocabulary in the input language.
-            n_layers: An integer for the no. of RNN layers in the model.
+            n_rnn_blocks: An integer for the no. of RNN blocks in the model.
             rate: A floating point value for the dropout rate in the model.
 
         Returns:
@@ -31,79 +34,76 @@ class Encoder(tf.keras.Model):
             vocab_size, int
         ), "Variable vocab_size should be of type 'int'."
         assert vocab_size > 0, "Variable vocab_size should be greater than 0."
-        assert isinstance(n_layers, int), "Variable n_layers should be of type 'int'."
-        assert (
-            n_layers % 2 == 0 and n_layers > 0
-        ), "Variable n_layers should be divisible by 2 and greater than 0."
+        assert isinstance(
+            n_rnn_blocks, int
+        ), "Variable n_rnn_blocks should be of type 'int'."
+        assert n_rnn_blocks > 0, "Variable n_rnn_blocks should be greater than 0."
         assert isinstance(rate, float), "Variable rate should be of type 'float'."
         assert 0 <= rate <= 1, "Variable rate should be between 0 & 1."
 
         # Initializes class variables.
         self.units = units
-        self.n_layers = n_layers
+        self.n_rnn_blocks = n_rnn_blocks
         self.model_layers = dict()
 
         # Initializes bidirectional RNN block.
         self.model_layers["embedding_0"] = tf.keras.layers.Embedding(
             input_dim=vocab_size, output_dim=units, name="embedding_0"
         )
-        self.model_layers["rnn_fwd"] = tf.keras.layers.LSTM(
-            units=units // 2, return_state=True, return_sequences=True, name="rnn_fwd"
+        self.model_layers["block_0_rnn_fwd"] = tf.keras.layers.LSTM(
+            units=units // 2,
+            return_state=True,
+            return_sequences=True,
+            name="block_0_rnn_fwd",
         )
-        self.model_layers["rnn_bwd"] = tf.keras.layers.LSTM(
+        self.model_layers["block_0_rnn_bwd"] = tf.keras.layers.LSTM(
             units=units // 2,
             return_state=True,
             return_sequences=True,
             go_backwards=True,
-            name="rnn_bwd",
+            name="block_0_rnn_bwd",
         )
-        self.model_layers["bi_rnn"] = tf.keras.layers.Bidirectional(
-            layer=self.model_layers["rnn_fwd"],
-            backward_layer=self.model_layers["rnn_bwd"],
+        self.model_layers["block_0_bi_rnn"] = tf.keras.layers.Bidirectional(
+            layer=self.model_layers["block_0_rnn_fwd"],
+            backward_layer=self.model_layers["block_0_rnn_bwd"],
             merge_mode="concat",
-            name="bi_rnn",
+            name="block_0_bi_rnn",
         )
-        self.model_layers["dropout_0"] = tf.keras.layers.Dropout(
-            rate=rate, name="dropout_0"
+        self.model_layers["block_0_dropout_0"] = tf.keras.layers.Dropout(
+            rate=rate, name="block_0_dropout_0"
         )
-        self.model_layers["dropout_1"] = tf.keras.layers.Dropout(
-            rate=rate, name="dropout_1"
+        self.model_layers["block_0_concat_0"] = tf.keras.layers.Concatenate(
+            axis=-1, name="block_0_concat_0"
         )
-        self.model_layers["concat_0"] = tf.keras.layers.Concatenate(
-            axis=-1, name="concat_0"
-        )
-        self.model_layers["concat_1"] = tf.keras.layers.Concatenate(
-            axis=-1, name="concat_1"
+        self.model_layers["block_0_concat_1"] = tf.keras.layers.Concatenate(
+            axis=-1, name="block_0_concat_1"
         )
 
         # Initializes RNN blocks.
-        l_id = 2
-        while l_id < n_layers:
-            self.model_layers[f"rnn_{l_id}"] = tf.keras.layers.LSTM(
+        b_id = 1
+        while b_id < n_rnn_blocks:
+            self.model_layers[f"block_{b_id}_rnn_0"] = tf.keras.layers.LSTM(
                 units=units,
                 return_state=True,
                 return_sequences=True,
-                name=f"rnn_{l_id}",
+                name=f"block_{b_id}_rnn_0",
             )
-            self.model_layers[f"rnn_{l_id + 1}"] = tf.keras.layers.LSTM(
+            self.model_layers[f"block_{b_id}_rnn_1"] = tf.keras.layers.LSTM(
                 units=units,
                 return_state=True,
                 return_sequences=True,
-                name=f"rnn_{l_id + 1}",
+                name=f"block_{b_id}_rnn_1",
             )
-            self.model_layers[f"add_{l_id - 2}"] = tf.keras.layers.Add(
-                name=f"add_{l_id - 2}"
+            self.model_layers[f"block_{b_id}_add_0"] = tf.keras.layers.Add(
+                name=f"block_{b_id}_add_0"
             )
-            self.model_layers[f"add_{l_id - 1}"] = tf.keras.layers.Add(
-                name=f"add_{l_id - 1}"
+            self.model_layers[f"block_{b_id}_add_1"] = tf.keras.layers.Add(
+                name=f"block_{b_id}_add_1"
             )
-            self.model_layers[f"dropout_{l_id}"] = tf.keras.layers.Dropout(
-                rate=rate, name=f"dropout_{l_id}"
+            self.model_layers[f"block_{b_id}_dropout_0"] = tf.keras.layers.Dropout(
+                rate=rate, name=f"block_{b_id}_dropout_0"
             )
-            self.model_layers[f"dropout_{l_id + 1}"] = tf.keras.layers.Dropout(
-                rate=rate, name=f"dropout_{l_id + 1}"
-            )
-            l_id += 2
+            b_id += 1
 
     def call(
         self,
@@ -145,7 +145,7 @@ class Encoder(tf.keras.Model):
             forward_carry_state,
             backward_memory_state,
             backward_carry_state,
-        ) = self.model_layers["bi_rnn"](
+        ) = self.model_layers["block_0_bi_rnn"](
             x,
             initial_state=[
                 forward_memory_state,
@@ -154,10 +154,10 @@ class Encoder(tf.keras.Model):
                 backward_carry_state,
             ],
         )
-        memory_state = self.model_layers["concat_0"](
+        memory_state = self.model_layers["block_0_concat_0"](
             [forward_memory_state, backward_memory_state]
         )
-        carry_state = self.model_layers["concat_1"](
+        carry_state = self.model_layers["block_0_concat_1"](
             [forward_carry_state, backward_carry_state]
         )
         del (
@@ -166,31 +166,27 @@ class Encoder(tf.keras.Model):
             backward_memory_state,
             backward_carry_state,
         )
-        x = self.model_layers["dropout_0"](x)
-        memory_state = self.model_layers["dropout_1"](memory_state)
-        carry_state = self.model_layers["dropout_1"](carry_state)
+        x = self.model_layers["block_0_dropout_0"](x)
 
         # Passes inputs through RNN blocks.
-        l_id = 2
-        while l_id < self.n_layers:
-            x_, memory_state_, carry_state_ = self.model_layers[f"rnn_{l_id}"](
+        b_id = 2
+        while b_id < self.n_rnn_blocks:
+            x_, memory_state_, carry_state_ = self.model_layers[f"block_{b_id}_rnn_0"](
                 x, initial_state=[memory_state, carry_state]
             )
-            x = self.model_layers[f"add_{l_id - 2}"]([x, x_])
-            memory_state = self.model_layers[f"add_{l_id - 1}"](
+            x = self.model_layers[f"block_{b_id}_add_0"]([x, x_])
+            memory_state = self.model_layers[f"block_{b_id}_add_1"](
                 [memory_state, memory_state_]
             )
-            carry_state = self.model_layers[f"add_{l_id - 1}"](
+            carry_state = self.model_layers[f"block_{b_id}_add_1"](
                 [carry_state, carry_state_]
             )
             del x_, memory_state_, carry_state_
-            x, memory_state, carry_state = self.model_layers[f"rnn_{l_id + 1}"](
+            x, memory_state, carry_state = self.model_layers[f"block_{b_id}_rnn_1"](
                 x, initial_state=[memory_state, carry_state]
             )
-            x = self.model_layers[f"dropout_{l_id}"](x)
-            memory_state = self.model_layers[f"dropout_{l_id + 1}"](memory_state)
-            carry_state = self.model_layers[f"dropout_{l_id + 1}"](carry_state)
-            l_id += 2
+            x = self.model_layers[f"block_{b_id}_dropout_0"](x)
+            b_id += 2
         return [x, memory_state, carry_state]
 
     def initialize_hidden_states(self, batch_size: int) -> List[tf.Tensor]:
