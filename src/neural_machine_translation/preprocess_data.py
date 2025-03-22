@@ -121,3 +121,45 @@ class PreprocessDataset(object):
                 f"Finished extracting files from '{self.language}-en.zip' to {extracted_data_directory_path}."
             )
             print()
+
+    def extract_europarl_dataset(self) -> None:
+        """Extracts the Europarl dataset for the language given as input by user.
+
+        Extracts the Europarl dataset for the language given as input by user.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Creates absolute directory path for downloaded data tar file.
+        tar_file_path = os.path.join(
+            BASE_PATH, "data", "raw_data", "europarl", f"{self.language}-en.tgz"
+        )
+
+        # Creates the directory path.
+        extracted_data_directory_path = check_directory_path_existence(
+            os.path.join("data", "extracted_data", "europarl", f"{self.language}-en")
+        )
+
+        # If file does not exist, then extracts files from the directory.
+        if not os.path.exists(
+            os.path.join(
+                extracted_data_directory_path,
+                f"europarl-v7.{self.language}-en.{self.language}",
+            )
+        ):
+            # Extracts files from downloaded data tar file into a directory.
+            try:
+                file = tarfile.open(tar_file_path)
+                file.extractall(extracted_data_directory_path)
+                file.close()
+            except FileNotFoundError as error:
+                raise FileNotFoundError(
+                    f"{tar_file_path} does not exist. Run 'download_data.py' to download the data."
+                )
+            print(
+                f"Finished extracting files from '{self.language}-en.tgz' to {extracted_data_directory_path}."
+            )
+            print()
