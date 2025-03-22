@@ -2,7 +2,6 @@ import os
 import io
 
 import sentencepiece as spm
-import tensorflow_datasets as tfds
 import tensorflow as tf
 
 from src.utils import check_directory_path_existence, load_text_file
