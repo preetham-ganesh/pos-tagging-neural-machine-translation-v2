@@ -471,3 +471,80 @@ class PreprocessDataset(object):
             f"No. of processed {self.language}-en pairs in Europarl dataset: {n_processed_pairs}"
         )
         print()
+
+    def preprocess_paracrawl_dataset(self) -> None:
+        """Preprocesses the Paracrawl dataset for the language given as input by user.
+
+        Preprocesses the Paracrawl dataset for the language given as input by user.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Loads the Paracrawl dataset for the language given as input by user.
+        dataset, info = tfds.load(
+            f"para_crawl/en{self.language}_plain_text",
+            split="train",
+            with_info=True,
+            shuffle_files=True,
+            data_dir=os.path.join(
+                BASE_PATH, "data", "raw_data", "paracrawl", f"{self.language}-en"
+            ),
+        )
+        n_rows = info.splits["train"].num_examples
+        print(
+            f"No. of original {self.language}-en pairs in Paracrawl dataset: {n_rows}"
+        )
+
+        # Iterates across rows in the dataset.
+        n_processed_pairs = 0
+        for id_0, row in enumerate(dataset):
+
+            # Splits text into sentences using NLTK.
+            en_sentences = self.split_text_into_sentences(
+                row["en"].numpy().decode("utf-8"), "en"
+            )
+            eu_sentences = self.split_text_into_sentences(
+                row[self.language].numpy().decode("utf-8"), self.language
+            )
+
+            # If no. of sentences in the english & european text are not equal, then skips it.
+            if len(en_sentences) != len(eu_sentences):
+                continue
+
+            # Iterates across sentence pairs in the text.
+            for en_text, eu_text in zip(en_sentences, eu_sentences):
+
+                # Preprocesses the text in the dataset.
+                processed_en_text = self.preprocess_text(en_text, "en", True)
+                processed_eu_text = self.preprocess_text(eu_text, self.language, True)
+
+                # If text is not empty, then it is appended to list.
+                if processed_en_text != "" and processed_eu_text != "":
+                    self.processed_texts.append(
+                        {
+                            "en": processed_en_text,
+                            self.language: processed_eu_text,
+                            "dataset": "paracrawl",
+                        }
+                    )
+                    n_processed_pairs += 1
+
+            if id_0 % 1000 == 0:
+                print(
+                    f"Finished processing {((id_0 / n_rows) * 100):.3f}% {self.language}-en pairs in Paracrawl dataset."
+                )
+
+            # If dataset size is mini, then only 10% of the dataset is processed.
+            if self.dataset_size == "mini" and n_processed_pairs >= int(n_rows * 0.01):
+                break
+
+        # Deletes dataset variable.
+        del dataset
+        print()
+        print(
+            f"No. of processed {self.language}-en pairs in Paracrawl dataset: {n_processed_pairs}"
+        )
+        print()
