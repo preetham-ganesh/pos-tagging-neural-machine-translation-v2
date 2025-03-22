@@ -189,3 +189,90 @@ class PreprocessDataset(object):
 
         # Replace consecutive whitespace characters with a single space.
         return " ".join(text.split())
+
+    def preprocess_text(self, text: str, language: str, update_word_count: bool) -> str:
+        """Preprocesses text to remove unwanted characters from it.
+
+        Preprocesses text to remove unwanted characters from it.
+
+        Args:
+            text: A string for the text which needs to be processed.
+            language: A string for the language the text belongs to.
+            update_unique_words: A boolean value for updating the word count.
+
+        Returns:
+            A string for processed version of input text.
+        """
+        # Asserts type & values of the arguments.
+        assert isinstance(text, str), "Variable text should be of type 'str'."
+        assert isinstance(
+            update_word_count, bool
+        ), "Variable update_word_count should be of type 'bool'."
+
+        # Removes HTML markup components from text provided as input.
+        text = self.remove_html_markup(text)
+
+        # Strip leading & trailing whitespace.
+        text = text.strip()
+
+        # Replaces unwanted characters in text.
+        text = text.replace("##at##-##at##", "-")
+        text = text.replace("&apos;", "'")
+        text = text.replace("&quot;", '"')
+        text = text.replace("&#91;", "")
+        text = text.replace("&#93;", "")
+        text = text.replace("&#124;", "")
+        text = text.replace('"', ' " ')
+
+        # Splits text into list of words as strings, and ignores empty words.
+        text_words = [word for word in text.split(" ") if word not in ["", " "]]
+
+        # If no. of words in current text is more than maximum limit, then text is ignored.
+        if len(text_words) > self.n_max_words_per_text:
+            return ""
+
+        # Adds spaces before & after special characters for all languages.
+        special_chars = "-!$&(),./%:;?€'\""
+        for char in special_chars:
+            text = text.replace(char, f" {char} ")
+
+        # Converts all characters in text to lowercase.
+        text = text.lower()
+
+        # Based on name of the language, removes characters from text.
+        if language == "en":
+            text = "".join(
+                id_0
+                for id_0 in unicodedata.normalize("NFKD", str(text))
+                if unicodedata.category(id_0) != "Mn"
+            )
+            text = re.sub(r"[^-!$&(),./%0-9:;?a-z€'\"]+", " ", text)
+
+        elif language == "es":
+            text = re.sub(r"[^-!$&(),./%0-9:;?áéíóúñü¿¡a-z€'\"]+", " ", text)
+
+        elif language == "fr":
+            text = re.sub(r"[^-!$&(),./%0-9:;?!çàâæéèêëîïôöûüù'€\"*a-z]+", " ", text)
+
+        elif language == "de":
+            text = re.sub(r"[^-!$&(),./%0-9:;?!äöüßœáéíóúñüa-z'€\"*]+", " ", text)
+
+        # Splits text into list of words as strings.
+        text_words = text.split(" ")
+
+        # Iterates across words in text.
+        filtered_words = list()
+        for word in text_words:
+            # If word is not empty, then it is appended to list.
+            if word != "":
+                filtered_words.append(word)
+
+                # Unique word count is updated for current word.
+                if update_word_count:
+                    self.unique_words_count[language][word] = (
+                        1 + self.unique_words_count[language].get(word, 0)
+                    )
+
+        # Converts of list of filtered words into a single string.
+        filtered_text = " ".join(filtered_words)
+        return filtered_text
