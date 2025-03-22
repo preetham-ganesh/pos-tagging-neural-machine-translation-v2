@@ -578,3 +578,27 @@ class PreprocessDataset(object):
             f"No. of rare words for {language} language in the dataset: {len(self.rare_words[language])}"
         )
         print()
+
+    def identify_common_rare_words(self) -> None:
+        """Identifies common rare words between en & the european language.
+
+        Identifies common rare words between en & the european language.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Identifies rare words for each language in the dataset.
+        self.identify_language_rare_words("en")
+        self.identify_language_rare_words(self.language)
+
+        # Identifies common rare words between en & the european language.
+        self.common_rare_words = set(
+            self.rare_words[self.language] & self.rare_words["en"]
+        )
+        print(
+            f"No. of common rare words between en & {self.language} texts: {len(self.common_rare_words)}"
+        )
+        print()
