@@ -9,7 +9,6 @@ import logging
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-print(BASE_PATH)
 sys.path.append(BASE_PATH)
 warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.FATAL)

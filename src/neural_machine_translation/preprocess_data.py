@@ -10,7 +10,7 @@ import tarfile
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_PATH)
 warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.FATAL)
@@ -276,3 +276,26 @@ class PreprocessDataset(object):
         # Converts of list of filtered words into a single string.
         filtered_text = " ".join(filtered_words)
         return filtered_text
+
+    def split_text_into_sentences(self, text: str, language: str) -> List[str]:
+        """Splits text into sentences using NLTK.
+
+        Splits text into sentences using NLTK.
+
+        Args:
+            text: A string for the text that needs to be processed.
+            language: A string for the name of the language the text belongs to.
+
+        Returns:
+            A list of strings for sentences extracted from the text.
+        """
+        # Creates a dictionary to store language full names.
+        supported_languages = {
+            "en": "english",
+            "es": "spanish",
+            "fr": "french",
+            "de": "german",
+        }
+
+        # Splits text into sentences.
+        return nltk.tokenize.sent_tokenize(text, language=supported_languages[language])
