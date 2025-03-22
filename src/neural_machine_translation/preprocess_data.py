@@ -810,3 +810,82 @@ class PreprocessDataset(object):
                     processed_data_directory_path,
                 )
             print()
+
+
+def main():
+    print()
+
+    # Parses the arguments.
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-l",
+        "--language",
+        type=str,
+        required=True,
+        help="Enter name of language for which datasets should be downloaded. Current options: 'es', fr' or 'de'.",
+    )
+    parser.add_argument(
+        "-ds",
+        "--dataset_size",
+        type=str,
+        required=True,
+        help="Enter the size of the processed dataset.",
+    )
+    parser.add_argument(
+        "-nmwpt",
+        "--n_max_words_per_text",
+        type=int,
+        required=True,
+        help="Enter no. of maximum words allowed in a text.",
+    )
+    parser.add_argument(
+        "-dv",
+        "--dataset_version",
+        type=str,
+        required=True,
+        help="Enter the version by which the processed dataset should be saved as.",
+    )
+    args = parser.parse_args()  # Add arg for dataset size.
+
+    # Checks if the arguments, have valid values.
+    check_language(args.language)
+    assert args.dataset_size in [
+        "mini",
+        "full",
+    ], "Argument dataset_size should have value as 'mini' or 'full'."
+
+    #  Creates object attributes for the PreprocessText class.
+    preprocessor = PreprocessDataset(
+        args.language,
+        args.dataset_size,
+        args.n_max_words_per_text,
+        args.dataset_version,
+    )
+
+    # Extracts the Tatoeba dataset for the language given as input by user.
+    preprocessor.extract_tatoeba_dataset()
+
+    # Extracts the Europarl dataset for the language given as input by user.
+    preprocessor.extract_europarl_dataset()
+
+    # Preprocesses the Tatoeba dataset for the language given as input by user.
+    preprocessor.preprocess_tatoeba_dataset()
+
+    # Preprocesses the Europarl dataset for the language given as input by user.
+    preprocessor.preprocess_europarl_dataset()
+
+    # Preprocesses the Paracrawl dataset for the language given as input by user.
+    preprocessor.preprocess_paracrawl_dataset()
+
+    # Handles out-of-vocabulary words for all text pairs in the dataset.
+    preprocessor.oov_handling()
+
+    # Splits the OOV handled text pairs into train, validation & test sets.
+    preprocessor.split_dataset()
+
+    # Saves processed and OOV handled texts as text files.
+    preprocessor.save_dataset()
+
+
+if __name__ == "__main__":
+    main()
