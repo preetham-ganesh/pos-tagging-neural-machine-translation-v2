@@ -299,3 +299,89 @@ class PreprocessDataset(object):
 
         # Splits text into sentences.
         return nltk.tokenize.sent_tokenize(text, language=supported_languages[language])
+
+    def preprocess_tatoeba_dataset(self) -> None:
+        """Preprocesses the Tatoeba dataset for the language given as input by user.
+
+        Preprocesses the Tatoeba dataset for the language given as input by user.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # A dictionary for the name of the text files in each language.
+        text_name = {"fr": "fra.txt", "de": "deu.txt", "es": "spa.txt"}
+
+        # Loads the Tatoeba dataset for the language given as input by user.
+        data = pd.read_csv(
+            os.path.join(
+                BASE_PATH,
+                "data",
+                "extracted_data",
+                "tatoeba",
+                f"{self.language}-en",
+                text_name[self.language],
+            ),
+            sep="\t",
+            encoding="utf-8",
+            names=["en", self.language, "x"],
+        )
+        print(
+            f"No. of original {self.language}-en pairs in Tatoeba dataset: {len(data)}"
+        )
+        print()
+
+        # Iterates across rows in the dataset.
+        n_processed_pairs = 0
+        for id_0, row in data.iterrows():
+
+            # Splits text into sentences using NLTK.
+            en_sentences = self.split_text_into_sentences(str(row["en"]), "en")
+            eu_sentences = self.split_text_into_sentences(
+                str(row[self.language]), self.language
+            )
+
+            # If no. of sentences in the english & european text are not equal, then skips it.
+            if len(en_sentences) != len(eu_sentences):
+                continue
+
+            # Iterates across sentence pairs in the text.
+            for en_text, eu_text in zip(en_sentences, eu_sentences):
+
+                # Preprocesses the text in the dataset.
+                processed_en_text = self.preprocess_text(en_text, "en", True)
+                processed_eu_text = self.preprocess_text(eu_text, self.language, True)
+
+                # If text is not empty, then it is appended to list.
+                if processed_en_text != "" and processed_eu_text != "":
+                    self.processed_texts.append(
+                        {
+                            "en": processed_en_text,
+                            self.language: processed_eu_text,
+                            "dataset": "tatoeba",
+                        }
+                    )
+                    n_processed_pairs += 1
+
+            if id_0 % 1000 == 0:
+                print(
+                    f"Finished processing {((id_0 / len(data)) * 100):.3f}% {self.language}-en pairs in Tatoeba "
+                    + "dataset."
+                )
+
+            # If dataset size is mini, then only 10% of the dataset is processed.
+            if self.dataset_size == "mini" and n_processed_pairs >= int(
+                len(data) * 0.01
+            ):
+                break
+
+        # Deletes data variable.
+        del data
+
+        print()
+        print(
+            f"No. of processed {self.language}-en pairs in Tatoeba dataset: {n_processed_pairs}"
+        )
+        print()
