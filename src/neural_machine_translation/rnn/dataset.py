@@ -293,3 +293,54 @@ class Dataset(object):
             + [self.word_to_ids[language]["</s>"]]
         )
         return text_ids
+
+    def load_input_target_batches(
+        self, input_texts: List[str], target_texts: List[str]
+    ) -> List[tf.Tensor]:
+        """Loads input & target batch sequences as tensors from input & target texts.
+
+        Loads input & target batch sequences as tensors from input & target texts.
+
+        Args:
+            input_texts: A list of strings for input texts in current batch.
+            target_texts: A list of strings for target texts in current batch.
+
+        Returns:
+            A list of tensors input & target batch of sequences.
+        """
+        # Checks types & values of arguments.
+        assert isinstance(
+            input_texts, list
+        ), "Variable input_texts should be of type 'list'."
+        assert isinstance(
+            target_texts, list
+        ), "Variable target_texts should be of type 'str'."
+
+        # Creates empty lists to store processed input & target texts.
+        input_batch, target_batch = list(), list()
+
+        # Iterates across input & target texts in current batch.
+        for id_0 in range(len(input_texts)):
+
+            # Appends tokenized input & target texts to input & target batches.
+            input_batch.append(
+                self.tokenize_text(str(input_texts[id_0], "UTF-8"), self.input_language)
+            )
+            target_batch.append(
+                self.tokenize_text(
+                    str(target_texts[id_0], "UTF-8"), self.target_language
+                )
+            )
+
+        # Pads input & target batch tensors with 0 at the end.
+        input_batch = tf.keras.preprocessing.sequence.pad_sequences(
+            input_batch, padding="post", dtype="int32"
+        )
+        target_batch = tf.keras.preprocessing.sequence.pad_sequences(
+            target_batch, padding="post", dtype="int32"
+        )
+
+        # Converts input & target batches into tensor of data type int32.
+        input_batch = tf.convert_to_tensor(input_batch, dtype=tf.int32)
+        target_batch = tf.convert_to_tensor(target_batch, dtype=tf.int32)
+        return [input_batch, target_batch]
