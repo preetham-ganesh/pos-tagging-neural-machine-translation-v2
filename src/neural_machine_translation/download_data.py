@@ -148,3 +148,32 @@ def download_europarl_dataset(language: str) -> None:
             f"Finished downloading Europarl dataset for {language}-en in {(time.time() - start_time):.3f} sec."
         )
     print()
+
+
+def download_paracrawl_dataset(language: str) -> None:
+    """Downloads the Paracrawl dataset for the language given as input by user.
+
+    Downloads the Paracrawl dataset for the language given as input by user.
+
+    Args:
+        language: A string for the language the Europarl dataset should be downloaded.
+
+    Returns:
+        None.
+    """
+    # Checks if the language is valid or not.
+    check_language(language)
+
+    # Downloads paracrawl dataset into the corresponding directory for the current european language.
+    start_time = time.time()
+    _, _ = tfds.load(
+        f"para_crawl/en{language}_plain_text".format(language),
+        split="train",
+        with_info=True,
+        shuffle_files=True,
+        data_dir=os.path.join("data", "raw_data", "paracrawl", f"{language}-en"),
+    )
+    print(
+        f"Finished downloading paracrawl dataset for {language}-en in {(time.time() - start_time):.3f} sec."
+    )
+    print()
