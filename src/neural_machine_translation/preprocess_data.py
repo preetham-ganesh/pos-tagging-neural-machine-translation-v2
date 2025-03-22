@@ -724,3 +724,89 @@ class PreprocessDataset(object):
 
         # Deletes oov handled texts.
         del self.oov_handled_texts
+
+    def save_dataset(self) -> None:
+        """Saves processed and OOV handled texts as text files.
+
+        Saves processed and OOV handled texts as text files.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Checks if the following directory path exists.
+        processed_data_directory_path = check_directory_path_existence(
+            os.path.join(
+                "data",
+                "processed_data",
+                f"{self.language}-en",
+                f"v{self.dataset_version}",
+            )
+        )
+
+        # Iterates across different train, validation, and test set splits.
+        for split_name in self.split_texts.keys():
+
+            # Creates empty strings to store combined texts in current split.
+            en_texts, eu_texts = "", ""
+
+            # Iterates across rows in current split.
+            s_id = 0
+            for r_id in range(len(self.split_texts[split_name])):
+
+                # Adds new line to the texts when its not empty.
+                if en_texts:
+                    en_texts += "\n"
+                    eu_texts += "\n"
+
+                # Adds current row's english and european texts to main string.
+                en_texts += self.split_texts[split_name][r_id]["en"]
+                eu_texts += self.split_texts[split_name][r_id][self.language]
+
+                # If name of the split is train, and if no of rows == 2 ** 20, then saves the text files.
+                if split_name == "train" and r_id % (2**20) == 0 and r_id != 0:
+                    # Ensures last line does not end with '\n'.
+                    en_texts = en_texts.rstrip("\n")
+                    eu_texts = eu_texts.rstrip("\n")
+
+                    save_text_file(
+                        en_texts,
+                        f"{split_name}_{s_id}.en",
+                        processed_data_directory_path,
+                    )
+                    save_text_file(
+                        eu_texts,
+                        f"{split_name}_{s_id}.{self.language}",
+                        processed_data_directory_path,
+                    )
+                    s_id += 1
+                    en_texts, eu_texts = "", ""
+
+            # Ensures last line does not end with '\n'.
+            en_texts = en_texts.rstrip("\n")
+            eu_texts = eu_texts.rstrip("\n")
+
+            # Saves OOV handled texts in current split as text file.
+            if len(en_texts) > 0 and split_name == "train":
+                save_text_file(
+                    en_texts,
+                    f"{split_name}_{s_id}.en",
+                    processed_data_directory_path,
+                )
+                save_text_file(
+                    eu_texts,
+                    f"{split_name}_{s_id}.{self.language}",
+                    processed_data_directory_path,
+                )
+            else:
+                save_text_file(
+                    en_texts, f"{split_name}.en", processed_data_directory_path
+                )
+                save_text_file(
+                    eu_texts,
+                    f"{split_name}.{self.language}",
+                    processed_data_directory_path,
+                )
+            print()
