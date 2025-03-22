@@ -263,3 +263,33 @@ class Dataset(object):
 
         # Deletes dataset pairs from memory.
         del self.dataset_pairs
+
+    def tokenize_text(self, text: str, language: str) -> List[int]:
+        """Tokenizes text to convert into ids using trained SentencePiece tokenizer for the language.
+
+        Tokenizes text to convert into pieces. Encodes pieces into unique ids, and adds start & end tokens.
+
+        Args:
+            text: A string for the text that should be tokenized.
+            language: A string for the language the text belongs to.
+
+        Returns:
+            A list of integers for tokenized & encoded version of input text.
+        """
+        # Checks types & values of arguments.
+        assert isinstance(text, str), "Variable text should be of type 'str'."
+        assert isinstance(language, str), "Variable language should be of type 'str'."
+
+        # Converts text into tokens based on tokenizer trained for the language.
+        text_tokens = self.tokenizer[language].EncodeAsPieces(text)
+
+        # Encodes tokens into ids.
+        text_ids = [self.word_to_ids[language][token] for token in text_tokens]
+
+        # Adds starting (<s>) & ending (</s>) tokens to the text ids.
+        text_ids = (
+            [self.word_to_ids[language]["<s>"]]
+            + text_ids
+            + [self.word_to_ids[language]["</s>"]]
+        )
+        return text_ids
