@@ -79,3 +79,45 @@ class PreprocessDataset(object):
         self.rare_words = {"en": set(), self.language: set()}
         self.processed_texts = list()
         self.dataset_version = dataset_version
+
+    def extract_tatoeba_dataset(self) -> None:
+        """Extracts the Tatoeba dataset for the language given as input by user.
+
+        Extracts the Tatoeba dataset for the language given as input by user.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Creates absolute directory path for downloaded data zip file.
+        zip_file_path = os.path.join(
+            BASE_PATH, "data", "raw_data", "tatoeba", f"{self.language}-en.zip"
+        )
+
+        # Creates the directory path.
+        extracted_data_directory_path = check_directory_path_existence(
+            os.path.join("data", "extracted_data", "tatoeba", f"{self.language}-en")
+        )
+
+        # A dictionary for the name of the text files in each language.
+        text_name = {"fr": "fra.txt", "de": "deu.txt", "es": "spa.txt"}
+
+        # If file does not exist, then extracts files from the directory.
+        if not os.path.exists(
+            os.path.join(extracted_data_directory_path, text_name[self.language])
+        ):
+
+            # Extracts files from downloaded data zip file into a directory.
+            try:
+                with zipfile.ZipFile(zip_file_path, "r") as zip_file:
+                    zip_file.extractall(extracted_data_directory_path)
+            except FileNotFoundError as error:
+                raise FileNotFoundError(
+                    f"{zip_file_path} does not exist. Run 'download_data.py' to download the data."
+                )
+            print(
+                f"Finished extracting files from '{self.language}-en.zip' to {extracted_data_directory_path}."
+            )
+            print()
