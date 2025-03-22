@@ -682,3 +682,45 @@ class PreprocessDataset(object):
             f"No. of OOV handled {self.language}-en pairs in the dataset: {n_oov_handled_pairs}"
         )
         print()
+
+    def split_dataset(self) -> None:
+        """Splits the OOV handled text pairs into train, validation & test sets.
+
+        Splits the OOV handled text pairs into train, validation & test sets.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Shuffles the text pairs in the dataset.
+        self.oov_handled_texts = shuffle(self.oov_handled_texts, random_state=42)
+
+        # Sets the no. of validation & test pairs.
+        n_validation_pairs, n_test_pairs = 2000, 2000
+
+        # Creates empty dictionary to store split texts.
+        self.split_texts = dict()
+
+        # Splits the dataset into train, validation & test sets.
+        self.split_texts["validation"] = self.oov_handled_texts[:n_validation_pairs]
+        self.split_texts["test"] = self.oov_handled_texts[
+            n_validation_pairs : n_validation_pairs + n_test_pairs
+        ]
+        self.split_texts["train"] = self.oov_handled_texts[
+            n_validation_pairs + n_test_pairs :
+        ]
+        print(
+            f"No. of train {self.language}-en pairs in the dataset: {len(self.split_texts['train'])}"
+        )
+        print(
+            f"No. of validation {self.language}-en pairs in the dataset: {len(self.split_texts['validation'])}"
+        )
+        print(
+            f"No. of test {self.language}-en pairs in the dataset: {len(self.split_texts['test'])}"
+        )
+        print()
+
+        # Deletes oov handled texts.
+        del self.oov_handled_texts
