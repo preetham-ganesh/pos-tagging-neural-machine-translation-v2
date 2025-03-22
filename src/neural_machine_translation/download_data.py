@@ -177,3 +177,38 @@ def download_paracrawl_dataset(language: str) -> None:
         f"Finished downloading paracrawl dataset for {language}-en in {(time.time() - start_time):.3f} sec."
     )
     print()
+
+
+def main():
+    print()
+
+    # Parses the arguments.
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-l",
+        "--language",
+        type=str,
+        required=True,
+        help="Enter name of language for which datasets should be downloaded. Current options: 'es', fr' or 'de'.",
+    )
+    args = parser.parse_args()
+
+    # Checks if the arguments, have valid values.
+    assert args.language in [
+        "es",
+        "fr",
+        "de",
+    ], "Argument language should have value as 'es', 'fr', or 'de'."
+
+    # Downloads the Tatoeba dataset for the language given as input by user.
+    download_tatoeba_dataset(args.language)
+
+    # Downloads the Europarl dataset for the language given as input by user.
+    download_europarl_dataset(args.language)
+
+    # Downloads the Paracrawl dataset for the language given as input by user.
+    download_paracrawl_dataset(args.language)
+
+
+if __name__ == "__main__":
+    main()
