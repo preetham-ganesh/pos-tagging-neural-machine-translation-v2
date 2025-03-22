@@ -1,5 +1,7 @@
 import os
+import io
 
+import sentencepiece as spm
 import tensorflow_datasets as tfds
 import tensorflow as tf
 
@@ -40,6 +42,8 @@ class Dataset(object):
         self.target_language = target_language
         self.dataset_pairs = {"train": list(), "validation": list(), "test": list()}
         self.tokenizer = dict()
+        self.word_to_ids = {"en": dict(), model_configuration["language"]: dict()}
+        self.ids_to_words = {"en": dict(), model_configuration["language"]: dict()}
 
     def load_data(self, split_name: str) -> None:
         """Loads text pairs for the specified dataset split (train, validation, test).
@@ -129,3 +133,71 @@ class Dataset(object):
         print(
             f"No. of text pairs in the {split_name} split: {len(self.dataset_pairs[split_name]['en'])}"
         )
+
+    def train_tokenizer(self, language: str) -> None:
+        """Trains SentencePiece tokenize on the text in the training split.
+
+        Combines text in training split into a string, and converts it into text stream to train the SentencePiece
+        tokenizer. Populates the words -> ids and ids -> words dictionary.
+
+        Args:
+            language: A string for the name of the language the text belongs to.
+
+        Returns:
+            None.
+        """
+        # Asserts type & value of the arguments.
+        assert isinstance(language, str), "Variable language should be of type 'str'."
+        assert language in [
+            "en",
+            "es",
+            "de",
+            "fr",
+        ], "Variable language should have value as 'en', 'es', 'fr', or 'de'."
+        assert isinstance(
+            tokenizer_directory_path, str
+        ), "Variable tokenizer_directory_path should be of type 'str'."
+
+        # Checks if the following directory path exists.
+        tokenizer_directory_path = check_directory_path_existence(
+            os.path.join(
+                "models",
+                f"{self.input_language}-{self.target_language}",
+                f"v{self.model_configuration['version']}",
+                "tokenizer",
+            )
+        )
+
+        # Combines text in train split.
+        combined_text = ""
+        for text in self.dataset_pairs["train"][language]:
+            combined_text += text
+            combined_text += "\n"
+
+        # Trains the tokenizer for current language.
+        with io.StringIO(combined_text) as text_stream:
+            spm.SentencePieceTrainer.Train(
+                sentence_iterator=text_stream,
+                model_prefix=os.path.join(tokenizer_directory_path, language),
+                vocab_size=self.model_configuration["tokenizer"]["language"][
+                    "vocab_size"
+                ],
+                model_type=self.model_configuration["tokenizer"]["model_type"],
+            )
+        print(f"Finished training tokenizer for {language} language.")
+
+        # Loads the trained tokenizer.
+        self.tokenizer[language] = spm.SentencePieceProcessor(
+            model_file=os.path.join(tokenizer_directory_path, f"{language}.model")
+        )
+
+        # Populates the words <-> ids dictionary for the current language.
+        for id_0 in range(self.tokenizer[language].get_piece_size()):
+            self.word_to_ids[language][self.tokenizer[language].id_to_piece(id_0)] = (
+                id_0 + 1
+            )
+            self.ids_to_words[language][id_0 + 1] = self.tokenizer[
+                language
+            ].id_to_piece(id_0)
+        print(f"Vocabulary size for {language}: {len(self.ids_to_words[language]) + 1}")
+        print()
