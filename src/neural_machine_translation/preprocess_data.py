@@ -602,3 +602,35 @@ class PreprocessDataset(object):
             f"No. of common rare words between en & {self.language} texts: {len(self.common_rare_words)}"
         )
         print()
+
+    def oov_handling_per_pair(self, en_text: str, eu_text: str) -> List[str]:
+        """Handles out-of-vocabulary words in the text pairs.
+
+        Handles out-of-vocabulary words in the text pairs. Converts rare words into unique format.
+
+        Args:
+            en_text: A string for the English text.
+            eu_text: A string for the European text.
+
+        Returns:
+            A list of strings for the English & European text after handling out-of-vocabulary words.
+        """
+        # Asserts type & values of the arguments.
+        assert isinstance(en_text, str), "Variable en_text should be of type 'str'."
+        assert isinstance(eu_text, str), "Variable eu_text should be of type 'str'."
+
+        # Converts text into unique set of words.
+        en_words = set(en_text.split(" "))
+        eu_words = set(eu_text.split(" "))
+
+        # Identifies common list of rare words between en & eu text.
+        common_words = list(en_words & self.common_rare_words & eu_words)
+
+        # Iterates across words in common words list.
+        unk_count = 0
+        for word in common_words:
+            if f" {word} " in en_text and f" {word} " in eu_text:
+                en_text = en_text.replace(f" {word} ", f" <unk{unk_count}> ")
+                eu_text = eu_text.replace(f" {word} ", f" <unk{unk_count}> ")
+                unk_count += 1
+        return [en_text, eu_text]
