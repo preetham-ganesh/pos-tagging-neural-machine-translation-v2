@@ -385,3 +385,89 @@ class PreprocessDataset(object):
             f"No. of processed {self.language}-en pairs in Tatoeba dataset: {n_processed_pairs}"
         )
         print()
+
+    def preprocess_europarl_dataset(self) -> None:
+        """Preprocesses the Europarl dataset for the language given as input by user.
+
+        Preprocesses the Europarl dataset for the language given as input by user.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Loads the Europarl dataset for the language given as input by user.
+        original_en_texts = load_text_file(
+            f"europarl-v7.{self.language}-en.en",
+            os.path.join(
+                BASE_PATH, "data", "extracted_data", "europarl", f"{self.language}-en"
+            ),
+        ).split("\n")
+        original_eu_texts = load_text_file(
+            f"europarl-v7.{self.language}-en.{self.language}",
+            os.path.join(
+                BASE_PATH, "data", "extracted_data", "europarl", f"{self.language}-en"
+            ),
+        ).split("\n")
+
+        # Checks if the length of both the lists are equal.
+        assert len(original_en_texts) == len(
+            original_eu_texts
+        ), f"Length of en and {self.language} texts should be equal."
+        print(
+            f"No. of original {self.language}-en pairs in Europarl dataset: {len(original_en_texts)}"
+        )
+        print()
+
+        # Iterates across rows in the dataset.
+        n_processed_pairs = 0
+        for id_0 in range(len(original_en_texts)):
+
+            # Splits text into sentences using NLTK.
+            en_sentences = self.split_text_into_sentences(original_en_texts[id_0], "en")
+            eu_sentences = self.split_text_into_sentences(
+                original_eu_texts[id_0], self.language
+            )
+
+            # If no. of sentences in the english & european text are not equal, then skips it.
+            if len(en_sentences) != len(eu_sentences):
+                continue
+
+            # Iterates across sentence pairs in the text.
+            for en_text, eu_text in zip(en_sentences, eu_sentences):
+
+                # Preprocesses the text in the dataset.
+                processed_en_text = self.preprocess_text(en_text, "en", True)
+                processed_eu_text = self.preprocess_text(eu_text, self.language, True)
+
+                # If text is not empty, then it is appended to list.
+                if processed_en_text != "" and processed_eu_text != "":
+                    self.processed_texts.append(
+                        {
+                            "en": processed_en_text,
+                            self.language: processed_eu_text,
+                            "dataset": "europarl",
+                        }
+                    )
+                    n_processed_pairs += 1
+
+            if id_0 % 1000 == 0:
+                print(
+                    f"Finished processing {((id_0 / len(original_en_texts)) * 100):.3f}% {self. language}-en pairs in "
+                    + "Europarl dataset."
+                )
+
+            # If dataset size is mini, then only 10% of the dataset is processed.
+            if self.dataset_size == "mini" and n_processed_pairs >= int(
+                len(original_en_texts) * 0.01
+            ):
+                break
+
+        # Deletes original_en_texts & original_eu_texts variables.
+        del original_en_texts, original_eu_texts
+        print()
+        print(
+            f"No. of processed {self.language}-en pairs in Europarl dataset: {n_processed_pairs}"
+        )
+        print()
