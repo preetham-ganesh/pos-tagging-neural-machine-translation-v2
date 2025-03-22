@@ -232,7 +232,7 @@ class PreprocessDataset(object):
             return ""
 
         # Adds spaces before & after special characters for all languages.
-        special_chars = "-!$&(),./%:;?€'\""
+        special_chars = "-!$&(),./%:;?€¿'\""
         for char in special_chars:
             text = text.replace(char, f" {char} ")
 
