@@ -1,6 +1,7 @@
 import os
 
 from src.utils import load_json_file
+from src.neural_machine_translation.rnn.dataset import Dataset
 
 
 class Train(object):
@@ -52,4 +53,41 @@ class Train(object):
         )
         self.model_configuration = load_json_file(
             f"v{self.model_version}", model_configuration_directory_path
+        )
+
+    def load_dataset(self) -> None:
+        """Loads the dataset based on model configuration.
+
+        Loads the dataset based on model configuration.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Creates object attributes for the Dataset class.
+        self.dataset = Dataset(
+            self.model_configuration, self.input_language, self.target_language
+        )
+
+        # Loads text pairs for the specified dataset split (train, validation, test).
+        self.dataset.load_data("train")
+        self.dataset.load_data("validation")
+        self.dataset.load_data("test")
+        print()
+
+        # Trains SentencePiece tokenize on the text in the training split.
+        self.dataset.train_tokenizer(self.input_language)
+        self.dataset.train_tokenizer(self.target_language)
+
+        # Converts split data into tensor dataset & slices them based on batch size.
+        self.dataset.shuffle_slice_dataset()
+
+        # Updates input & target vocab size, and pe input & target in model configuration.
+        self.model_configuration["model"]["input_vocab_size"] = (
+            self.dataset.tokenizer[self.input_language].vocab_size + 1
+        )
+        self.model_configuration["model"]["target_vocab_size"] = (
+            self.dataset.tokenizer[self.target_language].vocab_size + 1
         )
