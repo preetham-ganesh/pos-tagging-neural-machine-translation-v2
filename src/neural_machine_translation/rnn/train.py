@@ -1,5 +1,7 @@
 import os
 
+import mlflow
+
 from src.utils import load_json_file
 from src.neural_machine_translation.rnn.dataset import Dataset
 from src.neural_machine_translation.rnn.model import (
@@ -20,6 +22,7 @@ class Train(object):
         dataset_version: str,
         units: int,
         n_blocks: int,
+        attention_type: str,
     ) -> None:
         """Creates object attributes for the Train class.
 
@@ -32,6 +35,7 @@ class Train(object):
             dataset_version: A string for the version of the dataset used for training the model.
             units: An integer for the no. of units in each RNN layer.
             n_blocks: An integer for the no. of blocks in the Encoder & Decoder models.
+            attention_type: A string for the type of attention in the Decoder model.
 
         Returns:
             None.
@@ -54,6 +58,11 @@ class Train(object):
         ], "Variable d_units should have value as 512 or 1024."
         assert isinstance(n_blocks, int), "Variable n_layers of type 'int'."
         assert 0 < n_blocks <= 4, "Variable n_layers should be between 1 & 4."
+        assert isinstance(attention_type, int), "Variable attention_type of type 'str'."
+        assert attention_type in [
+            "luong",
+            "bahdanau",
+        ], "Variable attention_type should have value as 'luong' or 'bahdanau'."
 
         # Initalizes class variables.
         self.model_name = model_name
@@ -62,6 +71,7 @@ class Train(object):
         self.dataset_version = dataset_version
         self.units = units
         self.n_blocks = n_blocks
+        self.attention_type = attention_type
         self.best_validation_loss = None
         self.step = 0
 
@@ -90,12 +100,33 @@ class Train(object):
         """
         self.home_directory_path = os.getcwd()
         model_configuration_directory_path = os.path.join(
-            self.home_directory_path,
-            f"configs/neural_machine_translation/{self.input_language}-{self.target_language}",
+            self.home_directory_path, "configs", "neural_machine_translation", "rnn"
         )
         self.model_configuration = load_json_file(
-            f"v{self.model_version}", model_configuration_directory_path
+            f"{self.dataset_size}_{self.units}", model_configuration_directory_path
         )
+
+        # Updates model configuration with model version, dataset name & version.
+        self.model_configuration["version"] = self.model_version
+        self.model_configuration["language"] = (
+            self.input_language
+            if self.target_language == "en"
+            else self.target_language
+        )
+        self.model_configuration["dataset"] = dict()
+        self.model_configuration["dataset"]["name"] = self.dataset_name
+        self.model_configuration["dataset"]["version"] = self.dataset_version
+        self.model_configuration["model"]["n_blocks"] = self.n_blocks
+
+        # Sets tag for architecture, model type, dataset version, input & target languages.
+        mlflow.set_tag("dataset_version", f"v{self.dataset_version}")
+        mlflow.set_tag("dataset_size", self.dataset_size)
+        mlflow.set_tag("architecture", "rnn")
+
+        # Logs parameters (n_layers & d_units).
+        mlflow.log_param("attention_type", self.attention_type)
+        mlflow.log_param("n_blocks", self.n_blocks)
+        mlflow.log_param("units", self.units)
 
     def load_dataset(self) -> None:
         """Loads the dataset based on model configuration.
