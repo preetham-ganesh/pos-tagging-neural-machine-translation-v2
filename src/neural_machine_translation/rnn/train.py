@@ -2,38 +2,80 @@ import os
 
 from src.utils import load_json_file
 from src.neural_machine_translation.rnn.dataset import Dataset
+from src.neural_machine_translation.rnn.model import (
+    Encoder,
+    LuongDecoder,
+    BahdanauDecoder,
+)
 
 
 class Train(object):
     """Trains the RNN-based Neural Machine Translation model based on the configuration."""
 
     def __init__(
-        self, model_version: str, input_language: str, target_language: str
+        self,
+        model_name: str,
+        model_version: str,
+        dataset_size: str,
+        dataset_version: str,
+        units: int,
+        n_blocks: int,
     ) -> None:
         """Creates object attributes for the Train class.
 
         Creates object attributes for the Train class.
 
         Args:
+            model_name: A string for the name of the model.
             model_version: A string for the version of the current model.
-            input_language: A string for the language of the input text.
-            target_language: A string for the language of the target text.
+            dataset_size: A string for the size of the dataset used for training the model.
+            dataset_version: A string for the version of the dataset used for training the model.
+            units: An integer for the no. of units in each RNN layer.
+            n_blocks: An integer for the no. of blocks in the Encoder & Decoder models.
 
         Returns:
             None.
         """
         # Asserts type & value of the arguments.
+        assert isinstance(model_name, str), "Variable model_version of type 'str'."
         assert isinstance(model_version, str), "Variable model_version of type 'str'."
-        assert isinstance(input_language, str), "Variable input_language of type 'str'."
+        assert isinstance(dataset_size, str), "Variable dataset_size of type 'str'."
+        assert dataset_size in [
+            "mini",
+            "full",
+        ], "Argument dataset_size should have value as 'mini' or 'full'."
         assert isinstance(
-            target_language, str
-        ), "Variable target_language of type 'str'."
+            dataset_version, str
+        ), "Variable dataset_version of type 'str'."
+        assert isinstance(units, int), "Variable d_units of type 'int'."
+        assert units in [
+            512,
+            1024,
+        ], "Variable d_units should have value as 512 or 1024."
+        assert isinstance(n_blocks, int), "Variable n_layers of type 'int'."
+        assert 0 < n_blocks <= 4, "Variable n_layers should be between 1 & 4."
 
         # Initalizes class variables.
+        self.model_name = model_name
         self.model_version = model_version
-        self.input_language = input_language
-        self.target_language = target_language
+        self.dataset_size = dataset_size
+        self.dataset_version = dataset_version
+        self.units = units
+        self.n_blocks = n_blocks
         self.best_validation_loss = None
+        self.step = 0
+
+        # Extracts input & target languages, and checks if they are valid.
+        self.input_language, self.target_language = model_name.split("-")
+        self.dataset_name = (
+            f"{self.target_language}-en"
+            if self.input_language == "en"
+            else f"{self.input_language}-en"
+        )
+        assert "en" in [
+            self.input_language,
+            self.target_language,
+        ], "Argument experiment_name should have 'en' as input or target language."
 
     def load_model_configuration(self) -> None:
         """Loads the model configuration file for model version.
