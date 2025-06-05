@@ -3,7 +3,7 @@ import os
 import mlflow
 import tensorflow as tf
 
-from src.utils import load_json_file
+from src.utils import load_json_file, check_directory_path_existence
 from src.neural_machine_translation.rnn.dataset import Dataset
 from src.neural_machine_translation.rnn.model import (
     Encoder,
@@ -227,3 +227,66 @@ class Train(object):
         )
         print("Finished loading model for current configuration.")
         print()
+
+    def generate_model_summary_and_plot(self, plot: bool) -> None:
+        """Generates summary & plot for loaded model.
+
+        Generates summary & plot for loaded model.
+
+        Args:
+            pool: A boolean value to whether generate model plot or not.
+
+        Returns:
+            None.
+        """
+        # Compiles the encoder model to log the model summary.
+        model_summary = list()
+        self.encoder.summary(print_fn=lambda x: model_summary.append(x))
+        model_summary = "\n".join(model_summary)
+        print(model_summary)
+        mlflow.log_text(model_summary, f"v{self.model_version}/encoder_summary.txt")
+
+        # Compiles the encoder model to log the model summary.
+        model_summary = list()
+        self.decoder.summary(print_fn=lambda x: model_summary.append(x))
+        model_summary = "\n".join(model_summary)
+        print(model_summary)
+        mlflow.log_text(model_summary, f"v{self.model_version}/decoder_summary.txt")
+
+        # Creates the following directory path if it does not exist.
+        self.reports_directory_path = check_directory_path_existence(
+            os.path.join(
+                "models",
+                "neural_machine_translation",
+                self.model_name,
+                f"v{self.model_version}",
+                "reports",
+            )
+        )
+
+        # Plots the model & saves it as a PNG file.
+        if plot:
+            tf.keras.utils.plot_model(
+                self.encoder,
+                os.path.join(self.reports_directory_path, "encoder_plot.png"),
+                show_shapes=True,
+                show_layer_names=True,
+                expand_nested=True,
+            )
+            tf.keras.utils.plot_model(
+                self.decoder,
+                os.path.join(self.reports_directory_path, "decoder_plot.png"),
+                show_shapes=True,
+                show_layer_names=True,
+                expand_nested=True,
+            )
+
+            # Logs the saved model plot PNG file.
+            mlflow.log_artifact(
+                os.path.join(self.reports_directory_path, "encoder_plot.png"),
+                f"v{self.model_version}",
+            )
+            mlflow.log_artifact(
+                os.path.join(self.reports_directory_path, "decoder_plot.png"),
+                f"v{self.model_version}",
+            )
