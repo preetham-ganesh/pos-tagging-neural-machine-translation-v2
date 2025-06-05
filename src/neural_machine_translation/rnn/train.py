@@ -1,6 +1,7 @@
 import os
 
 import mlflow
+import tensorflow as tf
 
 from src.utils import load_json_file
 from src.neural_machine_translation.rnn.dataset import Dataset
@@ -34,7 +35,7 @@ class Train(object):
             dataset_size: A string for the size of the dataset used for training the model.
             dataset_version: A string for the version of the dataset used for training the model.
             units: An integer for the no. of units in each RNN layer.
-            n_blocks: An integer for the no. of blocks in the Encoder & Decoder models.
+            n_rnn_blocks: An integer for the no. of RNN blocks in the Encoder & Decoder models.
             attention_type: A string for the type of attention in the Decoder model.
 
         Returns:
@@ -159,8 +160,70 @@ class Train(object):
 
         # Updates input & target vocab size, and pe input & target in model configuration.
         self.model_configuration["model"]["input_vocab_size"] = (
-            self.dataset.tokenizer[self.input_language].vocab_size + 1
+            len(self.dataset.ids_to_words[self.input_language]) + 1
         )
         self.model_configuration["model"]["target_vocab_size"] = (
-            self.dataset.tokenizer[self.target_language].vocab_size + 1
+            len(self.dataset.ids_to_words[self.target_language]) + 1
         )
+
+    def load_model(self) -> None:
+        """Loads model & other utilies based on model configuration.
+
+        Loads model & other utilies based on model configuration.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        # Loads encoder model for current model configuration.
+        self.encoder = Encoder(
+            self.model_configuration["model"]["units"],
+            self.model_configuration["model"]["input_vocab_size"],
+            self.model_configuration["model"]["n_blocks"],
+            self.model_configuration["model"]["rate"],
+        )
+
+        # Loads the decoder model based on attention type for current model configuration.
+        if self.attention_type == "luong":
+            self.decoder = LuongDecoder(
+                self.model_configuration["model"]["units"],
+                self.model_configuration["model"]["target_vocab_size"],
+                self.model_configuration["model"]["n_blocks"],
+                self.model_configuration["model"]["rate"],
+            )
+        else:
+            self.decoder = BahdanauDecoder(
+                self.model_configuration["model"]["units"],
+                self.model_configuration["model"]["target_vocab_size"],
+                self.model_configuration["model"]["n_blocks"],
+                self.model_configuration["model"]["rate"],
+            )
+
+        # Builds plottable graph for the encoder & decoder models.
+        self.encoder = self.encoder.build_graph()
+        self.decoder = self.decoder.build_graph()
+
+        # Loads the optimizer.
+        self.optimizer = tf.keras.optimizers.Adam(
+            learning_rate=self.model_configuration["model"]["learning_rate"]
+        )
+
+        # Creates checkpoint manager for the neural network model.
+        self.checkpoint_directory_path = os.path.join(
+            self.home_directory_path,
+            "models",
+            "neural_machine_translation",
+            self.model_name,
+            f"v{self.model_version}",
+            "checkpoints",
+        )
+        self.checkpoint = tf.train.Checkpoint(
+            optimizer=self.optimizer, encoder=self.encoder, decoder=self.decoder
+        )
+        self.manager = tf.train.CheckpointManager(
+            self.checkpoint, directory=self.checkpoint_directory_path, max_to_keep=1
+        )
+        print("Finished loading model for current configuration.")
+        print()
